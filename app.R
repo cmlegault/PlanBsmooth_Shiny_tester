@@ -66,8 +66,6 @@ WAA <- 0.000001 * (100*(1 - exp(-0.2 * seq(1,nages)))) ^ 3
 maturity <- c(0,0.2,0.5,0.8,rep(1, nages-4))
 selx <- c(0.1,0.2,0.5,0.8,0.9,rep(1, nages-5))
 nbaseyears <- 35
-nprojyears <- 50
-ntotyears <- nbaseyears + nprojyears
 
 # calculate F.table for use in MSY reference points
 nsteps <- 2001
@@ -137,7 +135,14 @@ ui <- fluidPage(
                              label = "Final F",
                              min = 0,
                              max = 1.0,
-                             value = 0.25)  
+                             value = 0.25),
+                 
+                 sliderInput("numprjyrs",
+                             label = "# Projection Years",
+                             min = 3,
+                             max = 50,
+                             step = 1,
+                             value = 10)
                  ),
           column(6,
                  sliderInput("sigmaF",
@@ -188,6 +193,10 @@ server <- function(input, output) {
 
    output$myPlots <- renderPlot({
 
+     # get total number of years
+     nprojyears <- input$numprjyrs
+     ntotyears <- nbaseyears + nprojyears
+     
      # create the deviate streams
      F_devs <- rnorm(nbaseyears)
      N1_devs <- rnorm(nages)
