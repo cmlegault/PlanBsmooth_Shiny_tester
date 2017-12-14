@@ -173,6 +173,13 @@ ui <- fluidPage(
                              label="Catch Advice Multiplier",
                              choices = list("1.0"   = 1,
                                             "0.75"  = 2),
+                             selected = 1),
+                 
+                 selectInput("assess_frequency",
+                             label = "Assessment Frequency",
+                             choices = list("Every Year" = 1,
+                                            "Alternating Years" = 2,
+                                            "Every Third Year" = 3),
                              selected = 1)
                  
                  )
@@ -299,25 +306,37 @@ server <- function(input, output) {
      catch_advice <- rep(NA, ntotyears)
      for(iyear in (nbaseyears + 1):ntotyears){
        
-       # get PlanBsmooth multiplier
-       PBres <- ApplyPlanBsmooth(dat           = avgS,
-                                 od            = ".\\",
-                                 my.title      = "PlanBsmooth fit",
-                                 terminal.year = iyear - 2,
-                                 nyears        = 33,
-                                 loess.span    = NA,
-                                 saveplots     = FALSE,
-                                 showplots     = FALSE)
-       PBmult[iyear] <- PBres$multiplier
-       if(is.na(PBmult[iyear])) PBmult[iyear] <- 1 # is this the correct default for PlanBsmooth crashing?
+       # determine whether this is an assessment year or not
+       runassess <- FALSE
+       iyeartest <- iyear - nbaseyears - 1
+       aaa <- input$assess_frequency
+       if((iyeartest %% as.numeric(input$assess_frequency)) == 0) runassess <- TRUE
        
-       # Calculate recent mean catch
-       rec_mean_catch <- mean(Yield[(iyear-4):(iyear-2)], na.rm=TRUE)
+       if(runassess == TRUE){
+         # get PlanBsmooth multiplier
+         PBres <- ApplyPlanBsmooth(dat           = avgS,
+                                   od            = ".\\",
+                                   my.title      = "PlanBsmooth fit",
+                                   terminal.year = iyear - 2,
+                                   nyears        = 33,
+                                   loess.span    = NA,
+                                   saveplots     = FALSE,
+                                   showplots     = FALSE)
+         PBmult[iyear] <- PBres$multiplier
+         if(is.na(PBmult[iyear])) PBmult[iyear] <- 1 # is this the correct default for PlanBsmooth crashing?
+         
+         # Calculate recent mean catch
+         rec_mean_catch <- mean(Yield[(iyear-4):(iyear-2)], na.rm=TRUE)
+         
+         # Determine catch advice
+         catch_advice_multiplier <- 1.0
+         if(input$catch_advice_mult == 2) catch_advice_multiplier <- 0.75
+         catch_advice[iyear] <- PBmult[iyear] * rec_mean_catch * catch_advice_multiplier
+       }
        
-       # Determine catch advice
-       catch_advice_multiplier <- 1.0
-       if(input$catch_advice_mult == 2) catch_advice_multiplier <- 0.75
-       catch_advice[iyear] <- PBmult[iyear] * rec_mean_catch * catch_advice_multiplier
+       if(runassess == FALSE){
+         catch_advice[iyear] <- catch_advice[iyear - 1]
+       }
 
        # bring forward population to this year
        pred_R <- sr_alpha * SSB[iyear-1] / (sr_beta + SSB[iyear-1])
