@@ -58,6 +58,47 @@ multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
   }
 }
 #--------------------------------------------------------------------------------
+############################################################################################
+ApplyFSD <- function(surveys,          # matrix with Year in first column and surveys in remaining columns
+                     npoint = 5,       # number of points in regression for slope (default = 5)
+                     termyr = NA,      # terminal year to use when computing slope (default = last year)
+                     Kp     = 0.75,    # gain for first derivative (default = 0.75)
+                     Kd     = 0.50     # gain for second derivative (default = 0.50)
+){
+  
+  # select data to use
+  if(is.na(termyr)) termyr <- max(surveys$Year, na.rm=TRUE)
+  dat.use <- filter(surveys, Year <= termyr) %>%
+    drop_na()  # removes years with missing index values
+  nyears <- max(dat.use$Year) - min(dat.use$Year) + 1 
+  
+  # get average slope from surveys
+  nsurveys <- length(surveys[1,]) - 1
+  sdat <- filter(dat.use, Year >= (termyr - npoint + 1)) 
+  sdat1 <- filter(dat.use, Year >= (termyr - npoint), Year <= (termyr - 1))
+  slopeterm <- rep(NA, nsurveys)  # slope for terminal year period for each survey
+  slopeterm1 <- rep(NA, nsurveys) # slope for period prior to terminal year for each survey
+  for (i in 1:nsurveys){
+    mylm <- lm(log(sdat[,(i+1)]) ~ sdat[,1])
+    mylm1 <- lm(log(sdat1[,(i+1)]) ~ sdat1[,1])
+    slopeterm[i] <- as.numeric(coefficients(mylm)[2])
+    slopeterm1[i] <- as.numeric(coefficients(mylm1)[2])
+  }
+  avgslope <- mean(slopeterm, na.rm=TRUE)
+  deltaslope <- mean(slopeterm1, na.rm=TRUE) - avgslope
+  
+  # compute multiplier
+  multiplier <- exp(Kp * avgslope + Kd * deltaslope)
+  
+  # make results list
+  res <- list()
+  res$avgslope <- avgslope
+  res$deltaslope <- deltaslope
+  res$multiplier <- multiplier
+  
+  return(res)
+}
+############################################################################################
 # some constants for now (make them variable later)
 R0 <- 1000
 M <- 0.2
@@ -99,7 +140,7 @@ spr0 <- filter(F.table, Fval == 0)$spr
 ui <- fluidPage(
    
    # Application title
-   titlePanel("Simulation Test PlanBsmooth"),
+   titlePanel("Simulation Test PlanBsmooth (red) and FSD (blue)"),
    
    # Sidebar with a slider input for number of bins 
    sidebarLayout(
@@ -200,6 +241,10 @@ server <- function(input, output) {
 
    output$myPlots <- renderPlot({
 
+     # colors
+     PB_color = "tomato"
+     FSD_color = "blue"
+     
      # get total number of years
      nprojyears <- input$numprjyrs
      ntotyears <- nbaseyears + nprojyears
@@ -290,19 +335,27 @@ server <- function(input, output) {
      survey1 <-  popB * exp(S1_devs * input$sigmaS1 - 0.5 * input$sigmaS1 * input$sigmaS1)
      survey2 <-  popB * exp(S2_devs * input$sigmaS2 - 0.5 * input$sigmaS2 * input$sigmaS2)
 
-     surveydf <- data.frame(Year = rep(1:nbaseyears, 2),
-                            Survey = c(rep("1", nbaseyears), rep("2", nbaseyears)),
-                            Value = c(survey1[1:nbaseyears], survey2[1:nbaseyears]) )
+     surveys <- data.frame(Year = 1:nbaseyears,
+                           survey1 = survey1[1:nbaseyears],
+                           survey2 = survey2[1:nbaseyears])
 
-     # compute the average survey
-     avgS <- surveydf %>%
-       group_by(Year) %>%
-       summarise(avg=mean(Value))
+     avgS <- data.frame(Year = 1:nbaseyears,
+                        avg = 0.5 * (survey1[1:nbaseyears] + survey2[1:nbaseyears]))
      
+     # duplicate starting point for FSD
+     NAA_FSD <- NAA
+     ZAA_FSD <- ZAA
+     SSB_FSD <- SSB
+     Fmult_applied_FSD <- Fmult_applied
+     Yield_FSD <- Yield
+
      #----------------------------------------------------------------
      # loop through projection years
      PBmult <- rep(NA, ntotyears)
      catch_advice <- rep(NA, ntotyears)
+     FSDmult <- rep(NA, ntotyears)
+     catch_advice_FSD <- rep(NA, ntotyears)
+     
      for(iyear in (nbaseyears + 1):ntotyears){
        
        # determine whether this is an assessment year or not
@@ -331,13 +384,24 @@ server <- function(input, output) {
          catch_advice_multiplier <- 1.0
          if(input$catch_advice_mult == 2) catch_advice_multiplier <- 0.75
          catch_advice[iyear] <- PBmult[iyear] * rec_mean_catch * catch_advice_multiplier
+         
+         # get FSD multiplier and catch advice
+         FSD <- ApplyFSD(surveys = surveys,
+                         npoint  = 5,
+                         termyr  = NA,
+                         Kp      = 0.75,
+                         Kd      = 0.50)
+         FSDmult[iyear] <- FSD$multiplier
+         catch_advice_FSD[iyear] <- FSDmult[iyear] * Yield[(iyear-2)]
        }
        
        if(runassess == FALSE){
          catch_advice[iyear] <- catch_advice[iyear - 1]
+         catch_advice_FSD[iyear] <- catch_advice_FSD[iyear - 1]
        }
 
-       # bring forward population to this year
+#--------------------------------------------------------------
+       # bring forward population to this year for PlanBsmooth 
        pred_R <- sr_alpha * SSB[iyear-1] / (sr_beta + SSB[iyear-1])
        NAA[iyear,1] <- pred_R * exp(R_devs[iyear] * input$sigmaR - 0.5 * input$sigmaR * input$sigmaR)
        for (i in 2:nages){
@@ -379,29 +443,83 @@ server <- function(input, output) {
          }
        }
        Fmult_applied[iyear] <- Fmult
-       FAA[iyear,] <- Fmult_applied[iyear] * selx
-       ZAA[iyear,] <- FAA[iyear,] + M
+       Faa <- Fmult * selx
+       ZAA[iyear,] <- Faa + M
        
        # calculate catch (should be equal to catch_advice)
-       CAA[iyear,] <- NAA[iyear,] * FAA[iyear,] * (1 - exp(-ZAA[iyear,])) / ZAA[iyear,]
-       YAA[iyear,] <- CAA[iyear,] * WAA
-       Yield[iyear] <- sum(YAA[iyear,])
+       Caa <- NAA[iyear,] * Faa * (1 - exp(-ZAA[iyear,])) / ZAA[iyear,]
+       Yaa <- Caa * WAA
+       Yield[iyear] <- sum(Yaa)
 
        # make surveys
        popB <- sum(NAA[iyear,] * WAA)
        survey1[iyear] <-  popB * exp(S1_devs[iyear] * input$sigmaS1 - 0.5 * input$sigmaS1 * input$sigmaS1)
        survey2[iyear] <-  popB * exp(S2_devs[iyear] * input$sigmaS2 - 0.5 * input$sigmaS2 * input$sigmaS2)
-       surveydf_year <- data.frame(Year = rep(iyear, 2),
-                                   Survey = c("1", "2"),
-                                   Value = c(survey1[iyear], survey2[iyear]) )
-       surveydf <- rbind(surveydf, surveydf_year)
-       
-       # compute the average survey
        avgS_year <- data.frame(Year = iyear,
-                               avg = (survey1[iyear] + survey2[iyear]) / 2)
+                               avg = 0.5 * (survey1[iyear] + survey2[iyear]))
        avgS <- rbind(avgS, avgS_year)
-
        
+#--------------------------------------------------------------
+       # bring forward population to this year for FSD 
+       pred_R <- sr_alpha * SSB_FSD[iyear-1] / (sr_beta + SSB_FSD[iyear-1])
+       NAA_FSD[iyear,1] <- pred_R * exp(R_devs[iyear] * input$sigmaR - 0.5 * input$sigmaR * input$sigmaR)
+       for (i in 2:nages){
+         NAA_FSD[iyear,i] <- NAA_FSD[iyear-1,i-1] * exp(-ZAA_FSD[iyear-1,i-1])
+       }
+       NAA_FSD[iyear,nages] <- NAA_FSD[iyear,nages] + 
+         NAA_FSD[iyear-1,nages] * exp(-ZAA_FSD[iyear-1,nages])
+       SSB_FSD[iyear] <- sum(NAA_FSD[iyear,] * maturity * WAA)
+       
+       # determine F for this year
+       Nvec <- NAA_FSD[iyear,]
+       ctarget <- catch_advice_FSD[iyear]
+       if(ctarget <= 1e-6 ){
+         Fmult <- 0
+       }
+       if(ctarget > 1e-6) {
+         Fmax <- 2
+         Fvec <- Fmax * selx
+         Zvec <- Fvec + M
+         y <- sum(Nvec * WAA * Fvec * (1-exp(-Zvec)) / Zvec)
+         if(y <= ctarget){
+           Fmult <- Fmax
+         }
+         if (y >ctarget){
+           a = 0
+           b = Fmax
+           for (itry in 1:25){
+             Fval <- (a + b) / 2
+             Fvec <- Fval * selx
+             Zvec <- Fvec + M
+             y <- sum(Nvec * WAA * Fvec * (1-exp(-Zvec)) / Zvec)
+             if (y <= ctarget){
+               a <- Fval
+             }
+             if (y > ctarget){
+               b <- Fval  
+             }
+           }    
+           Fmult <- (a + b) / 2
+         }
+       }
+       Fmult_applied_FSD[iyear] <- Fmult
+       Faa <- Fmult * selx
+       ZAA_FSD[iyear,] <- Faa + M
+       
+       # calculate catch (should be equal to catch_advice)
+       Caa <- NAA_FSD[iyear,] * Faa * (1 - exp(-ZAA_FSD[iyear,])) / ZAA_FSD[iyear,]
+       Yaa <- Caa * WAA
+       Yield_FSD[iyear] <- sum(Yaa)
+       
+       # make surveys
+       popB <- sum(NAA_FSD[iyear,] * WAA)
+       survey1[iyear] <-  popB * exp(S1_devs[iyear] * input$sigmaS1 - 0.5 * input$sigmaS1 * input$sigmaS1)
+       survey2[iyear] <-  popB * exp(S2_devs[iyear] * input$sigmaS2 - 0.5 * input$sigmaS2 * input$sigmaS2)
+       surveys_year <- data.frame(Year = iyear,
+                                  survey1 = survey1[iyear],
+                                  survey2 = survey2[iyear])
+       surveys <- rbind(surveys, surveys_year)
+
      } # end of projection loop
      #----------------------------------------------------------------
      
@@ -410,40 +528,55 @@ server <- function(input, output) {
      # add SR points to the SR curve plot
      sr_obs_proj <- data.frame(SSB = SSB[nbaseyears:(ntotyears - 1)],
                                Recruitment = NAA[(nbaseyears + 1):ntotyears, 1])
-     plot1 <- plot1 + geom_point(data=sr_obs_proj, aes(x=SSB, y=Recruitment), color="tomato")
+     sr_obs_proj_FSD <- data.frame(SSB = SSB_FSD[nbaseyears:(ntotyears - 1)],
+                                   Recruitment = NAA_FSD[(nbaseyears + 1):ntotyears, 1])
+     plot1 <- plot1 + geom_point(data=sr_obs_proj, aes(x=SSB, y=Recruitment), color=PB_color)
+     plot1 <- plot1 + geom_point(data=sr_obs_proj_FSD, aes(x=SSB, y=Recruitment), color=FSD_color)
 
      # add Fmult projections
      Fdf_proj <- data.frame(Year = (nbaseyears + 1):ntotyears,
                        Fmult = Fmult_applied[(nbaseyears + 1):ntotyears])
-     plot2 <- plot2 + geom_point(data=Fdf_proj, aes(x=Year, y=Fmult), color="tomato")
+     Fdf_proj_FSD <- data.frame(Year = (nbaseyears + 1):ntotyears,
+                                Fmult = Fmult_applied_FSD[(nbaseyears + 1):ntotyears])
+     plot2 <- plot2 + geom_point(data=Fdf_proj, aes(x=Year, y=Fmult), color=PB_color)
+     plot2 <- plot2 + geom_point(data=Fdf_proj_FSD, aes(x=Year, y=Fmult), color=FSD_color)
 
      # add Yield projections
      Ydf_proj <- data.frame(Year = (nbaseyears + 1):ntotyears,
                             Yield = Yield[(nbaseyears + 1):ntotyears])
-     plot3 <- plot3 + geom_point(data=Ydf_proj, aes(x=Year, y=Yield), color="tomato") 
+     Ydf_proj_FSD <- data.frame(Year = (nbaseyears + 1):ntotyears,
+                                Yield = Yield_FSD[(nbaseyears + 1):ntotyears])
+     plot3 <- plot3 + geom_point(data=Ydf_proj, aes(x=Year, y=Yield), color=PB_color)
+     plot3 <- plot3 + geom_point(data=Ydf_proj_FSD, aes(x=Year, y=Yield), color=FSD_color)
 
      # add Survey projections
      plot4 <- ggplot(filter(avgS, Year <= nbaseyears), aes(x=Year, y=avg)) +
        geom_point() +
-       geom_point(data=filter(avgS, Year > nbaseyears), aes(x=Year, y=avg), color="tomato") +
+       geom_point(data=filter(avgS, Year > nbaseyears), aes(x=Year, y=avg), color=PB_color) +
        labs(y = "Average Survey") +
        ylim(0, NA) +
        theme_bw()
+     avgS_FSD <- filter(surveys, Year > nbaseyears) %>%
+       mutate(avg = (0.5 * (survey1 + survey2)))
+     plot4 <- plot4 + geom_point(data=avgS_FSD, aes(x=Year, y=avg), color=FSD_color)
      
      # get the final PlanBsmooth fit
      plot5 <- PBres$tsplot
      
-     # plot PlanBsmooth multiplier
+     # plot multipliers
      PBmultdf <- data.frame(Year = seq(1,ntotyears),
                             Multiplier = PBmult)
-     
+     FSDmultdf <- data.frame(Year = seq(1,ntotyears),
+                             Multiplier = FSDmult)
      plot6 <- ggplot(PBmultdf, aes(x=Year, y=Multiplier)) +
-       geom_line(color="tomato", na.rm=TRUE) +
-       geom_point(color="tomato", na.rm=TRUE) +
+       geom_line(color=PB_color, na.rm=TRUE) +
+       geom_point(color=PB_color, na.rm=TRUE) +
        geom_hline(yintercept=1, color="black", linetype="dashed") +
        ylim(0, NA) +
        theme_bw()
-     
+     plot6 <- plot6 + geom_line(data=FSDmultdf, aes(x=Year, y=Multiplier), color=FSD_color, na.rm=TRUE)
+     plot6 <- plot6 + geom_point(data=FSDmultdf, aes(x=Year, y=Multiplier), color=FSD_color, na.rm=TRUE)
+
      # add reference points to the plots
      ref.pt.color <- "dark green"
      ref.pt.type <- "solid"
