@@ -302,7 +302,6 @@ server <- function(input, output) {
      #----------------------------------------------------------------
      # loop through projection years
      PBmult <- rep(NA, ntotyears)
-     catchdiff <- rep(NA, ntotyears)
      catch_advice <- rep(NA, ntotyears)
      for(iyear in (nbaseyears + 1):ntotyears){
        
@@ -387,8 +386,7 @@ server <- function(input, output) {
        CAA[iyear,] <- NAA[iyear,] * FAA[iyear,] * (1 - exp(-ZAA[iyear,])) / ZAA[iyear,]
        YAA[iyear,] <- CAA[iyear,] * WAA
        Yield[iyear] <- sum(YAA[iyear,])
-       catchdiff[iyear] <- catch_advice[iyear] - Yield[iyear]
-       
+
        # make surveys
        popB <- sum(NAA[iyear,] * WAA)
        survey1[iyear] <-  popB * exp(S1_devs[iyear] * input$sigmaS1 - 0.5 * input$sigmaS1 * input$sigmaS1)
