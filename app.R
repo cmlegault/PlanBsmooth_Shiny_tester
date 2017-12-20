@@ -107,6 +107,7 @@ WAA <- 0.000001 * (100*(1 - exp(-0.2 * seq(1,nages)))) ^ 3
 maturity <- c(0,0.2,0.5,0.8,rep(1, nages-4))
 selx <- c(0.1,0.2,0.5,0.8,0.9,rep(1, nages-5))
 nbaseyears <- 35
+minimumF <- 0.01
 
 # calculate F.table for use in MSY reference points
 nsteps <- 2001
@@ -442,8 +443,8 @@ server <- function(input, output) {
            Fmult <- (a + b) / 2
          }
        }
-       Fmult_applied[iyear] <- Fmult
-       Faa <- Fmult * selx
+       Fmult_applied[iyear] <- max(Fmult, minimumF)
+       Faa <- Fmult_applied[iyear] * selx
        ZAA[iyear,] <- Faa + M
        
        # calculate catch (should be equal to catch_advice)
@@ -502,8 +503,8 @@ server <- function(input, output) {
            Fmult <- (a + b) / 2
          }
        }
-       Fmult_applied_FSD[iyear] <- Fmult
-       Faa <- Fmult * selx
+       Fmult_applied_FSD[iyear] <- max(Fmult, minimumF)
+       Faa <- Fmult_applied_FSD[iyear] * selx
        ZAA_FSD[iyear,] <- Faa + M
        
        # calculate catch (should be equal to catch_advice)
