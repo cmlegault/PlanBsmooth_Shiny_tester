@@ -85,7 +85,7 @@ ApplyFSD <- function(surveys,          # matrix with Year in first column and su
     slopeterm1[i] <- as.numeric(coefficients(mylm1)[2])
   }
   avgslope <- mean(slopeterm, na.rm=TRUE)
-  deltaslope <- mean(slopeterm1, na.rm=TRUE) - avgslope
+  deltaslope <- avgslope - mean(slopeterm1, na.rm=TRUE)
   
   # compute multiplier
   multiplier <- exp(Kp * avgslope + Kd * deltaslope)
