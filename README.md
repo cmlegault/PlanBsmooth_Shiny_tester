@@ -1,5 +1,5 @@
 # PlanBsmooth_Shiny_tester
-A Shiny app to test the PlanBsmooth package
+A Shiny app to test the PlanBsmooth package and compare with Paul Rago's FSD (first second derivative) approach
 
 * When run should look something like this
 <img src="screen_shot2.png" width="800">
