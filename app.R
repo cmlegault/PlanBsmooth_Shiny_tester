@@ -550,6 +550,16 @@ server <- function(input, output) {
      plot3 <- plot3 + geom_point(data=Ydf_proj, aes(x=Year, y=Yield), color=PB_color)
      plot3 <- plot3 + geom_point(data=Ydf_proj_FSD, aes(x=Year, y=Yield), color=FSD_color)
 
+     # create cumulative Yield during projections plot
+     Ydf_proj_cum <- mutate(Ydf_proj, cumsum = cumsum(Yield))
+     Ydf_proj_FSD_cum <- mutate(Ydf_proj_FSD, cumsum = cumsum(Yield))
+     plot7 <- ggplot(Ydf_proj_cum, aes(x=Year, y=cumsum)) +
+       geom_point(color=PB_color) +
+       ylab("Cumulative Yield") +
+       expand_limits(x = 0) +
+       theme_bw()
+     plot7 <- plot7 + geom_point(data=Ydf_proj_FSD_cum, aes(x=Year, y=cumsum), color=FSD_color)
+     
      # add Survey projections
      plot4 <- ggplot(filter(avgS, Year <= nbaseyears), aes(x=Year, y=avg)) +
        geom_point() +
@@ -562,7 +572,7 @@ server <- function(input, output) {
      plot4 <- plot4 + geom_point(data=avgS_FSD, aes(x=Year, y=avg), color=FSD_color)
      
      # get the final PlanBsmooth fit
-     plot5 <- PBres$tsplot
+     #plot5 <- PBres$tsplot
      
      # plot multipliers
      PBmultdf <- data.frame(Year = seq(1,ntotyears),
@@ -594,7 +604,7 @@ server <- function(input, output) {
        geom_hline(yintercept=ref.pts$SSB[1], color=ref.pt.color, linetype=ref.pt.type)
      
      # make the final combined plot
-     multiplot(plot1, plot2, plot5, plot3, plot4, plot6, cols=2)
+     multiplot(plot1, plot2, plot4, plot3, plot7, plot6, cols=2)
 
   }, height = 800, width = 600)
 }

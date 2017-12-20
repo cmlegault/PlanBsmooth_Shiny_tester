@@ -2,7 +2,7 @@
 A Shiny app to test the PlanBsmooth package and compare with Paul Rago's FSD (first second derivative) approach
 
 * When run should look something like this
-<img src="screen_shot2.png" width="800">
+<img src="screen_shot.png" width="800">
 
 Controls for the simulation testing are:
 * Steepness - determines the shape of the stock-recruitment relationship (shown in top left plot)
