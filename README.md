@@ -15,7 +15,7 @@ Controls for the simulation testing are:
 * sigmaR - variability about stock-recruitment relationship in all years
 * sigmaS1 - variability about first survey in all years
 * sigmaS2 - variability about second survey in all years
-+ Note that sigma values are applied as exp(base_value + rnorm * sigma - 0.5 * sigma * sigma)
+  + Note that sigma values are applied as exp(base_value + rnorm * sigma - 0.5 * sigma * sigma)
 * Catch Advice Multiplier - applies only to PlanBsmooth
 * Assessment Frequency - catch held constant from previous value if no assessment in given year
 
