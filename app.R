@@ -184,7 +184,20 @@ ui <- fluidPage(
                              min = 3,
                              max = 50,
                              step = 1,
-                             value = 10)
+                             value = 10),
+                 
+                 sliderInput("AddMortYear",
+                             label = "Added Mortality Year",
+                             min = 1,
+                             max = 35,
+                             value = 25),
+                 
+                 sliderInput("AddMortVal",
+                             label = "Added Mortality",
+                             min = 0,
+                             max = 0.5,
+                             step = 0.02,
+                             value = 0)
                  ),
           column(6,
                  sliderInput("sigmaF",
@@ -222,7 +235,14 @@ ui <- fluidPage(
                              choices = list("Every Year" = 1,
                                             "Alternating Years" = 2,
                                             "Every Third Year" = 3),
-                             selected = 1)
+                             selected = 1),
+                 
+                 sliderInput("AddMortAges",
+                             label = "Added Mortality Ages",
+                             min = 1,
+                             max = 20,
+                             step = 1,
+                             value = c(1,20))
                  
                  )
         )
@@ -256,6 +276,10 @@ server <- function(input, output) {
      R_devs <- rnorm(ntotyears)
      S1_devs <- rnorm(ntotyears)
      S2_devs <- rnorm(ntotyears)
+     
+     # create additional mortality matrix
+     AM <- matrix(0, nrow=ntotyears, ncol=nages)
+     AM[input$AddMortYear:ntotyears, input$AddMortAges[1]:input$AddMortAges[2]] = input$AddMortVal
        
      # Stock-Recruitment Plot     
      x <- seq(0, R0*spr0, length.out = 1000)
@@ -268,7 +292,7 @@ server <- function(input, output) {
        geom_line() +
        theme_bw()
 
-     # get reference points
+     # get reference points (NOTE: do not include Added Mortality)
      F.table.1 <- mutate(F.table, SSB = sr_alpha * spr - sr_beta)
      F.table.2 <- mutate(F.table.1, Rval = sr_alpha * SSB / (sr_beta + SSB))
      F.table.full <- mutate(F.table.2, Yield = ypr * Rval)
@@ -282,7 +306,7 @@ server <- function(input, output) {
      Fmult_applied <- Fmult_base * exp(F_devs * input$sigmaF - 0.5 * input$sigmaF * input$sigmaF)
      FAA <- matrix(NA, nrow=ntotyears, ncol=nages)
      FAA[1:nbaseyears,] <- outer(Fmult_applied, selx)
-     ZAA <- FAA + M
+     ZAA <- FAA + M + AM
      Fdf <- data.frame(Year = 1:nbaseyears,
                        Fmult = Fmult_applied)
      plot2 <- ggplot(Fdf, aes(x=Year, y=Fmult)) +
@@ -413,6 +437,7 @@ server <- function(input, output) {
        
        # determine F for this year
        Nvec <- NAA[iyear,]
+       AMvec <- AM[iyear,]
        ctarget <- catch_advice[iyear]
        if(ctarget <= 1e-6 ){
          Fmult <- 0
@@ -420,7 +445,7 @@ server <- function(input, output) {
        if(ctarget > 1e-6) {
          Fmax <- 2
          Fvec <- Fmax * selx
-         Zvec <- Fvec + M
+         Zvec <- Fvec + M + AMvec
          y <- sum(Nvec * WAA * Fvec * (1-exp(-Zvec)) / Zvec)
          if(y <= ctarget){
            Fmult <- Fmax
@@ -431,7 +456,7 @@ server <- function(input, output) {
            for (itry in 1:25){
              Fval <- (a + b) / 2
              Fvec <- Fval * selx
-             Zvec <- Fvec + M
+             Zvec <- Fvec + M + AMvec
              y <- sum(Nvec * WAA * Fvec * (1-exp(-Zvec)) / Zvec)
              if (y <= ctarget){
                a <- Fval
@@ -445,7 +470,7 @@ server <- function(input, output) {
        }
        Fmult_applied[iyear] <- max(Fmult, minimumF)
        Faa <- Fmult_applied[iyear] * selx
-       ZAA[iyear,] <- Faa + M
+       ZAA[iyear,] <- Faa + M + AMvec
        
        # calculate catch (should be equal to catch_advice)
        Caa <- NAA[iyear,] * Faa * (1 - exp(-ZAA[iyear,])) / ZAA[iyear,]
@@ -473,6 +498,7 @@ server <- function(input, output) {
        
        # determine F for this year
        Nvec <- NAA_FSD[iyear,]
+       AMvec <- AM[iyear,]
        ctarget <- catch_advice_FSD[iyear]
        if(ctarget <= 1e-6 ){
          Fmult <- 0
@@ -480,7 +506,7 @@ server <- function(input, output) {
        if(ctarget > 1e-6) {
          Fmax <- 2
          Fvec <- Fmax * selx
-         Zvec <- Fvec + M
+         Zvec <- Fvec + M + AMvec
          y <- sum(Nvec * WAA * Fvec * (1-exp(-Zvec)) / Zvec)
          if(y <= ctarget){
            Fmult <- Fmax
@@ -491,7 +517,7 @@ server <- function(input, output) {
            for (itry in 1:25){
              Fval <- (a + b) / 2
              Fvec <- Fval * selx
-             Zvec <- Fvec + M
+             Zvec <- Fvec + M + AMvec
              y <- sum(Nvec * WAA * Fvec * (1-exp(-Zvec)) / Zvec)
              if (y <= ctarget){
                a <- Fval
@@ -505,7 +531,7 @@ server <- function(input, output) {
        }
        Fmult_applied_FSD[iyear] <- max(Fmult, minimumF)
        Faa <- Fmult_applied_FSD[iyear] * selx
-       ZAA_FSD[iyear,] <- Faa + M
+       ZAA_FSD[iyear,] <- Faa + M + AMvec
        
        # calculate catch (should be equal to catch_advice)
        Caa <- NAA_FSD[iyear,] * Faa * (1 - exp(-ZAA_FSD[iyear,])) / ZAA_FSD[iyear,]

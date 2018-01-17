@@ -18,5 +18,8 @@ Controls for the simulation testing are:
   + Note that sigma values are applied as exp(base_value + rnorm * sigma - 0.5 * sigma * sigma)
 * Catch Advice Multiplier - applies only to PlanBsmooth
 * Assessment Frequency - catch held constant from previous value if no assessment in given year
+* Added Mortality Year - year when additional mortality begins, continues to end of projection years, zero prior to this year
+* Added Mortality - a source of mortality added to the total but not included in reference point calculations, when set to zero the Added Mortality Year and Ages have no impact
+* Added Mortality Ages - age range for added mortality, zero for ages not selected
 
 In the plots, black dots indicate common values for both methods during base years (start at same point). Red dots show effect of applying PlanBsmooth to determine catch advice during projection years. Blue dots show effect of applying FSD to determine catch advice during projection years. Green solid lines show deterministic MSY related reference points. FSD uses default settings of Kp=0.75 and Kd=0.50 with 5 year time periods to determine slopes.
