@@ -176,7 +176,7 @@ ui <- fluidPage(
                              value = 0.6),
                  
                  bsTooltip("fyr20",
-                           "Fishing mortality in year 20, linear change between this and Final F in Yeaer change.",
+                           "Fishing mortality in year 20, linear change between this and Final F in Year change.",
                            "right"),
                  
                  sliderInput("fyrBreak",
@@ -208,7 +208,7 @@ ui <- fluidPage(
                              value = 10),
                  
                  bsTooltip("numPrjyrs",
-                           "BlanBsmooth and FSD used in feedback loop to determine catch in projection years.",
+                           "PlanBsmooth and FSD used in feedback loop to determine catch in projection years.",
                            "right"),
                  
                  sliderInput("addMortYear",
