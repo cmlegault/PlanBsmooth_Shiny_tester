@@ -151,7 +151,7 @@ ui <- fluidPage(
           column(6,
                  sliderInput("steepness",
                              label = "Steepness",
-                             min = 0.1,
+                             min = 0.21,
                              max = 1.0,
                              value = 0.7),
                  
