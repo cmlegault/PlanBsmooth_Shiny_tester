@@ -8,13 +8,14 @@
 #
 
 library(shiny)
+library(shinyBS)
 library(tidyverse)
 library(PlanBsmooth)
 
 #--------------------------------------------------------------------------------
 # Multiple plot function
 #
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# ggplot objects can be passed in ..., or to plotList (as a list of ggplot objects)
 # - cols:   Number of columns in layout
 # - layout: A matrix specifying the layout. If present, 'cols' is ignored.
 #
@@ -22,11 +23,11 @@ library(PlanBsmooth)
 # then plot 1 will go in the upper left, 2 will go in the upper right, and
 # 3 will go all the way across the bottom.
 #
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+multiPlot <- function(..., plotList=NULL, file, cols=1, layout=NULL) {
   library(grid)
   
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
+  # Make a list from the ... arguments and plotList
+  plots <- c(list(...), plotList)
   
   numPlots = length(plots)
   
@@ -73,12 +74,12 @@ ApplyFSD <- function(surveys,          # matrix with Year in first column and su
   nyears <- max(dat.use$Year) - min(dat.use$Year) + 1 
   
   # get average slope from surveys
-  nsurveys <- length(surveys[1,]) - 1
+  nSurveys <- length(surveys[1,]) - 1
   sdat <- filter(dat.use, Year >= (termyr - npoint + 1)) 
   sdat1 <- filter(dat.use, Year >= (termyr - npoint), Year <= (termyr - 1))
-  slopeterm <- rep(NA, nsurveys)  # slope for terminal year period for each survey
-  slopeterm1 <- rep(NA, nsurveys) # slope for period prior to terminal year for each survey
-  for (i in 1:nsurveys){
+  slopeterm <- rep(NA, nSurveys)  # slope for terminal year period for each survey
+  slopeterm1 <- rep(NA, nSurveys) # slope for period prior to terminal year for each survey
+  for (i in 1:nSurveys){
     mylm <- lm(log(sdat[,(i+1)]) ~ sdat[,1])
     mylm1 <- lm(log(sdat1[,(i+1)]) ~ sdat1[,1])
     slopeterm[i] <- as.numeric(coefficients(mylm)[2])
@@ -139,7 +140,7 @@ spr0 <- filter(F.table, Fval == 0)$spr
 #--------------------------------------------------------------------------------
 # Define UI for application that draws a histogram
 ui <- fluidPage(
-   
+  
    # Application title
    titlePanel("Simulation Test PlanBsmooth (red) and FSD (blue)"),
    
@@ -150,61 +151,97 @@ ui <- fluidPage(
           column(6,
                  sliderInput("steepness",
                              label = "Steepness",
-                             min = 0.21,
+                             min = 0.1,
                              max = 1.0,
                              value = 0.7),
                  
-                 sliderInput("Fyr1",
+                 bsTooltip("steepness", 
+                           "Determines the shape of the stock-recruitment relationship (shown in top left plot).",
+                           "right"),
+                 
+                 sliderInput("fyr1",
                              label = "F in first year",
                              min = 0,
                              max = 1.0,
                              value = 0.1),  
                  
-                 sliderInput("Fyr20",
+                 bsTooltip("fyr1",
+                           "Starting value for fishing mortality, linear change between this and F in year 20.",
+                           "right"),
+                 
+                 sliderInput("fyr20",
                              label = "F in year 20",
                              min = 0,
                              max = 1.0,
-                             value = 0.6),  
+                             value = 0.6),
                  
-                 sliderInput("Fyrbreak",
+                 bsTooltip("fyr20",
+                           "Fishing mortality in year 20, linear change between this and Final F in Yeaer change.",
+                           "right"),
+                 
+                 sliderInput("fyrBreak",
                              label = "Year change",
                              min = 21,
                              max = 35,
                              step = 1,
                              value = 30),
                  
-                 sliderInput("Ffinal",
+                 bsTooltip("fyrBreak",
+                           "Fishing mortality flat between Year change and year 25 (end of base years)",
+                           "right"),
+                 
+                 sliderInput("fFinal",
                              label = "Final F",
                              min = 0,
                              max = 1.0,
                              value = 0.25),
                  
-                 sliderInput("numprjyrs",
+                 bsTooltip("fFinal",
+                           "Fishing mortality in years from Year change to year 35 (set sigmaF to 0 to see F in base years).",
+                           "right"),
+                 
+                 sliderInput("numPrjyrs",
                              label = "# Projection Years",
                              min = 3,
                              max = 50,
                              step = 1,
                              value = 10),
                  
-                 sliderInput("AddMortYear",
+                 bsTooltip("numPrjyrs",
+                           "BlanBsmooth and FSD used in feedback loop to determine catch in projection years.",
+                           "right"),
+                 
+                 sliderInput("addMortYear",
                              label = "Added Mortality Year",
                              min = 1,
                              max = 35,
                              value = 25),
                  
-                 sliderInput("AddMortVal",
+                 bsTooltip("addMortYear",
+                           "Year when additional mortality begins, continues to end of projection years, zero prior to this year.",
+                           "right"),
+                 
+                 sliderInput("addMortVal",
                              label = "Added Mortality",
                              min = 0,
                              max = 0.5,
                              step = 0.02,
-                             value = 0)
+                             value = 0),
+                 
+                 bsTooltip("addMortVal",
+                           "A source of mortality added to the total but not included in reference point calculations, when set to zero the Added Mortality Year and Ages have no impact.",
+                           "right")
                  ),
           column(6,
                  sliderInput("sigmaF",
                              label = "sigmaF",
                              min = 0,
                              max = 1,
-                             value = 0.2),  
+                             value = 0.2), 
+                 
+                 bsTooltip("sigmaF",
+                           "Variability about F during first 35 years",
+                           "right"),
                  
                  sliderInput("sigmaR",
                              label = "sigmaR",
@@ -212,11 +249,19 @@ ui <- fluidPage(
                              max = 1,
                              value = 0.6),
                  
+                 bsTooltip("sigmaR",
+                           "Variability about stock-recruitment relationship in all years.",
+                           "right"),
+                 
                  sliderInput("sigmaS1",
                              label = "sigmaS1",
                              min = 0,
                              max = 1,
                              value = 0.2),
+                 
+                 bsTooltip("sigmaS1",
+                           "Variability about first survey in all years.",
+                           "right"),
                  
                  sliderInput("sigmaS2",
                              label = "sigmaS2",
@@ -224,27 +269,42 @@ ui <- fluidPage(
                              max = 1,
                              value = 0.4),
                  
-                 selectInput("catch_advice_mult",
+                 bsTooltip("sigmaS2",
+                           "Variabilty about second survey in all years.",
+                           "right"),
+                 
+                 selectInput("catchAdviceMult",
                              label="Catch Advice Multiplier",
                              choices = list("1.0"   = 1,
                                             "0.75"  = 2),
                              selected = 1),
                  
-                 selectInput("assess_frequency",
+                 bsTooltip("catchAdviceMult",
+                           "Applies only to PlanBsmooth.",
+                           "right"),
+                 
+                 selectInput("assessFrequency",
                              label = "Assessment Frequency",
                              choices = list("Every Year" = 1,
                                             "Alternating Years" = 2,
                                             "Every Third Year" = 3),
                              selected = 1),
                  
-                 sliderInput("AddMortAges",
+                 bsTooltip("assessFrequency",
+                           "Catch held constant from previous value if no assessment in given year.",
+                           "right"),
+                 
+                 sliderInput("addMortAges",
                              label = "Added Mortality Ages",
                              min = 1,
                              max = 20,
                              step = 1,
-                             value = c(1,20))
+                             value = c(1,20)),
                  
-                 )
+                 bsTooltip("addMortAges",
+                           "Age range for added mortality, zero for ages not selected.",
+                           "right")
+               )
         )
          
       ),
@@ -267,7 +327,7 @@ server <- function(input, output) {
      FSD_color = "blue"
      
      # get total number of years
-     nprojyears <- input$numprjyrs
+     nprojyears <- input$numPrjyrs
      ntotyears <- nbaseyears + nprojyears
      
      # create the deviate streams
@@ -279,7 +339,7 @@ server <- function(input, output) {
      
      # create additional mortality matrix
      AM <- matrix(0, nrow=ntotyears, ncol=nages)
-     AM[input$AddMortYear:ntotyears, input$AddMortAges[1]:input$AddMortAges[2]] = input$AddMortVal
+     AM[input$addMortYear:ntotyears, input$addMortAges[1]:input$addMortAges[2]] = input$addMortVal
        
      # Stock-Recruitment Plot     
      x <- seq(0, R0*spr0, length.out = 1000)
@@ -300,9 +360,9 @@ server <- function(input, output) {
 
      # Fmultiplier during base years plot
      Fmult_base <- rep(NA, nbaseyears)
-     Fmult_base[1:20] <- seq(input$Fyr1, input$Fyr20, length.out = 20)
-     Fmult_base[21:input$Fyrbreak] <- seq(input$Fyr20, input$Ffinal, length.out = input$Fyrbreak - 20)
-     Fmult_base[input$Fyrbreak:35] <- rep(input$Ffinal, 35 - input$Fyrbreak + 1)
+     Fmult_base[1:20] <- seq(input$fyr1, input$fyr20, length.out = 20)
+     Fmult_base[21:input$fyrBreak] <- seq(input$fyr20, input$fFinal, length.out = input$fyrBreak - 20)
+     Fmult_base[input$fyrBreak:35] <- rep(input$fFinal, 35 - input$fyrBreak + 1)
      Fmult_applied <- Fmult_base * exp(F_devs * input$sigmaF - 0.5 * input$sigmaF * input$sigmaF)
      FAA <- matrix(NA, nrow=ntotyears, ncol=nages)
      FAA[1:nbaseyears,] <- outer(Fmult_applied, selx)
@@ -322,7 +382,7 @@ server <- function(input, output) {
      N1[nages] <- N1[nages] / (1 - exp(-ZAA[1,nages]))
      
      NAA <- matrix(NA, nrow=ntotyears, ncol=nages)
-     R1 <- filter(F.table.full, Fval == input$Fyr1)
+     R1 <- filter(F.table.full, Fval == input$fyr1)
      NAA[1,] <- R1$Rval * N1 * exp(N1_devs * input$sigmaR - 0.5 * input$sigmaR * input$sigmaR)
      NAA[1,nages] <- R1$Rval * N1[nages] 
      SSB <- rep(NA, ntotyears)
@@ -386,8 +446,8 @@ server <- function(input, output) {
        # determine whether this is an assessment year or not
        runassess <- FALSE
        iyeartest <- iyear - nbaseyears - 1
-       aaa <- input$assess_frequency
-       if((iyeartest %% as.numeric(input$assess_frequency)) == 0) runassess <- TRUE
+       aaa <- input$assessFrequency
+       if((iyeartest %% as.numeric(input$assessFrequency)) == 0) runassess <- TRUE
        
        if(runassess == TRUE){
          # get PlanBsmooth multiplier
@@ -406,9 +466,9 @@ server <- function(input, output) {
          rec_mean_catch <- mean(Yield[(iyear-4):(iyear-2)], na.rm=TRUE)
          
          # Determine catch advice
-         catch_advice_multiplier <- 1.0
-         if(input$catch_advice_mult == 2) catch_advice_multiplier <- 0.75
-         catch_advice[iyear] <- PBmult[iyear] * rec_mean_catch * catch_advice_multiplier
+         catchAdviceMultiplier <- 1.0
+         if(input$catchAdviceMult == 2) catchAdviceMultiplier <- 0.75
+         catch_advice[iyear] <- PBmult[iyear] * rec_mean_catch * catchAdviceMultiplier
          
          # get FSD multiplier and catch advice
          FSD <- ApplyFSD(surveys = surveys,
@@ -630,7 +690,7 @@ server <- function(input, output) {
        geom_hline(yintercept=ref.pts$SSB[1], color=ref.pt.color, linetype=ref.pt.type)
      
      # make the final combined plot
-     multiplot(plot1, plot2, plot4, plot3, plot7, plot6, cols=2)
+     multiPlot(plot1, plot2, plot4, plot3, plot7, plot6, cols=2)
 
   }, height = 800, width = 600)
 }
