@@ -303,6 +303,15 @@ ui <- fluidPage(
                  
                  bsTooltip("addMortAges",
                            "Age range for added mortality, zero for ages not selected.",
+                           "right"),
+                 
+                 selectInput("capopt",
+                             label = "Apply 20% Cap to",
+                             choices = list("Neither", "PlanBsmooth", "FSD", "Both"),
+                             selected = "Neither"),
+                 
+                 bsTooltip("capopt",
+                           "Multipliers < 0.8 become 0.8 and multipliers > 1.2 become 1.2 for selected.",
                            "right")
                )
         )
@@ -460,6 +469,13 @@ server <- function(input, output) {
                                    saveplots     = FALSE,
                                    showplots     = FALSE)
          PBmult[iyear] <- PBres$multiplier
+         
+         # check for cap to multiplier
+         if (input$capopt %in% c("PlanBsmooth", "Both")){
+           PBmult[iyear] <- max(0.8, PBmult[iyear])
+           PBmult[iyear] <- min(1.2, PBmult[iyear])
+         }
+         
          if(is.na(PBmult[iyear])) PBmult[iyear] <- 1 # is this the correct default for PlanBsmooth crashing?
          
          # Calculate recent mean catch
@@ -477,6 +493,13 @@ server <- function(input, output) {
                          Kp      = 0.75,
                          Kd      = 0.50)
          FSDmult[iyear] <- FSD$multiplier
+         
+         # check for cap to multiplier
+         if (input$capopt %in% c("FSD", "Both")){
+           FSDmult[iyear] <- max(0.8, FSDmult[iyear])
+           FSDmult[iyear] <- min(1.2, FSDmult[iyear])
+         }
+
          catch_advice_FSD[iyear] <- FSDmult[iyear] * Yield[(iyear-2)]
        }
        
