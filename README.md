@@ -21,5 +21,6 @@ Controls for the simulation testing are:
 * Added Mortality Year - year when additional mortality begins, continues to end of projection years, zero prior to this year
 * Added Mortality - a source of mortality added to the total but not included in reference point calculations, when set to zero the Added Mortality Year and Ages have no impact
 * Added Mortality Ages - age range for added mortality, zero for ages not selected
+* Add 20% Cap to - limits multiplier to range 0.8 - 1.2 for neither, one of the models, or both PlanBsmooth and FSD
 
-In the plots, black dots indicate common values for both methods during base years (start at same point). Red dots show effect of applying PlanBsmooth to determine catch advice during projection years. Blue dots show effect of applying FSD to determine catch advice during projection years. Green solid lines show deterministic MSY related reference points. FSD uses default settings of Kp=0.75 and Kd=0.50 with 5 year time periods to determine slopes.
+In the plots, black dots indicate common values for both methods during base years (start at same point). Red dots show effect of applying PlanBsmooth to determine catch advice during projection years. Blue dots show effect of applying FSD to determine catch advice during projection years. Green solid lines show deterministic MSY related reference points. FSD uses default settings of Kp=0.75 and Kd=0.50 with 5 year time periods to determine slopes. Mouse rollover used to provide more information when app run.
