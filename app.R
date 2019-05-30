@@ -9,7 +9,9 @@
 
 library(shiny)
 library(shinyBS)
-library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
 library(PlanBsmooth)
 
 #--------------------------------------------------------------------------------
