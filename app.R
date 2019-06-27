@@ -140,7 +140,7 @@ F.table
 spr0 <- filter(F.table, Fval == 0)$spr 
 
 #--------------------------------------------------------------------------------
-# Define UI for application that draws a histogram
+# Define UI for application 
 ui <- fluidPage(
   
    # Application title
@@ -328,7 +328,7 @@ ui <- fluidPage(
 )
 
 #--------------------------------------------------------------------------------
-# Define server logic required to draw a histogram
+# Define server logic 
 server <- function(input, output) {
 
    output$myPlots <- renderPlot({
@@ -368,7 +368,12 @@ server <- function(input, output) {
      F.table.2 <- mutate(F.table.1, Rval = sr_alpha * SSB / (sr_beta + SSB))
      F.table.full <- mutate(F.table.2, Yield = ypr * Rval)
      ref.pts <- filter(F.table.full, Yield == max(Yield))
-
+     
+     # ensure all equilibrium values are positive for starting conditions
+     F.table.full$SSB <- ifelse(F.table.full$SSB < 0, 1e-8, F.table.full$SSB)
+     F.table.full$Rval <- ifelse(F.table.full$Rval < 0, 1e-8, F.table.full$Rval)
+     F.table.full$Yield <- ifelse(F.table.full$Yield < 0, 1e-8, F.table.full$Yield)
+     
      # Fmultiplier during base years plot
      Fmult_base <- rep(NA, nbaseyears)
      Fmult_base[1:20] <- seq(input$fyr1, input$fyr20, length.out = 20)
